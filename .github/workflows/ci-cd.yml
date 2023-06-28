@@ -1,0 +1,49 @@
+name: CI/CD - API Deployment
+
+on:
+  push:
+    branches:
+      - main
+
+# preventing multiple runs of the same workflow from overlapping or conflicting with each other.
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Setup node-version (18.x)
+        uses: actions/setup-node@v3
+        with:
+          node-version: 18.x
+
+      # cache node_modules
+      - name: Restore cached dependencies
+        uses: actions/cache@v3
+        id: yarn-cache
+        with:
+          path: |
+            **/node_modules
+          key: ${{ runner.os }}-yarn-${{ hashFiles('**/yarn.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-yarn-
+
+      # install dependencies if the cache did not hit
+      - name: Install dependencies
+        if: steps.yarn-cache.outputs.cache-hit != 'true'
+        run: yarn --frozen-lockfile
+
+      # - name: Install dependencies
+      #   run: yarn install
+
+      - name: Yarn Build
+        run: yarn build
+
+      - name: Deploy to Vercel
+        run: npx vercel --prod --token ${{ secrets.VERCEL_TOKEN }} -y
